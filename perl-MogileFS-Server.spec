@@ -20,6 +20,7 @@ BuildRequires:  perl(ExtUtils::MakeMaker)
 BuildRequires:  perl(Test::More)
 BuildRequires:  perl(MogileFS::Utils)
 BuildRequires:  perl(MogileFS::Client)
+BuildRequires:  perl(Danga::Socket)
 Requires:       perl(:MODULE_COMPAT_%(eval "`%{__perl} -V:version`"; echo $version))
 
 Provides:  MogileFS-Server = %{version}-%{release}
