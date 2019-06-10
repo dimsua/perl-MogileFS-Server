@@ -1,0 +1,22 @@
+From 0ee0fc50a9679fcaba6b84a129e46269f88557cb Mon Sep 17 00:00:00 2001
+From: "SUGITA, Toshinori" <sugita.toshinori@hpsys.co.jp>
+Date: Wed, 21 Nov 2018 08:45:33 +0900
+Subject: [PATCH] fix to crash JobMaster when DB lock timed out.
+
+---
+ lib/MogileFS/Store.pm | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/MogileFS/Store.pm b/lib/MogileFS/Store.pm
+index c16aec14..c3f8ceaa 100644
+--- a/lib/MogileFS/Store.pm
++++ b/lib/MogileFS/Store.pm
+@@ -1723,7 +1723,7 @@ sub grab_queue_chunk {
+     my $tries = 3;
+     my $work;
+ 
+-    return 0 unless $self->lock_queue($queue);
++    return unless $self->lock_queue($queue);
+ 
+     my $extwhere = shift || '';
+     my $fields = 'fid, nexttry, failcount';

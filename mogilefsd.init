@@ -1,0 +1,61 @@
+#!/bin/bash
+#
+# mogilefsd  This shell script controls the MogileFS tracker daemon
+#
+# Author:       Ruben Kerkhof <ruben@rubenkerkhof.com>
+#
+# chkconfig:    - 97 03
+#
+# description:  MogileFS is a distributed storage system
+# processname:  mogilefsd
+# config: /etc/mogilefs/mogilefsd.conf
+#
+
+# source function library
+. /etc/rc.d/init.d/functions
+
+RETVAL=0
+
+start() {
+        echo -n $"Starting MogileFS tracker daemon: "
+        daemon --user mogilefsd /usr/bin/mogilefsd --daemon
+        RETVAL=$?
+        echo
+        [ $RETVAL -eq 0 ] && touch /var/lock/subsys/mogilefsd
+}
+
+stop() {
+        echo -n $"Stopping MogileFS tracker daemon: "
+        killproc mogilefsd
+        echo
+        [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mogilefsd
+}
+
+restart() {
+        stop
+        start
+}
+
+case "$1" in
+  start)
+        start
+        ;;
+  stop)
+        stop
+        ;;
+  restart|force-reload|reload)
+        restart
+        ;;
+  condrestart)
+        [ -f /var/lock/subsys/mogilefsd ] && restart
+        ;;
+  status)
+        status mogilefsd
+        RETVAL=$?
+        ;;
+  *)
+        echo $"Usage: $0 {start|stop|status|restart|reload|force-reload|condrestart}"
+        exit 1
+esac
+
+exit $RETVAL

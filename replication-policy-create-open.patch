@@ -1,0 +1,234 @@
+From 5f6ad753eaa4f32e584b8f5dfa49334c38aa3ff1 Mon Sep 17 00:00:00 2001
+From: Allan Feid <afeid@shutterstock.com>
+Date: Wed, 21 Jan 2015 11:12:27 -0500
+Subject: [PATCH 1/4] Look at replication policy for create_open.
+
+This is a first pass, but essentially this tries to use a replication
+policy for a file to return an appropriate destination location.
+---
+ lib/MogileFS/Worker/Query.pm | 51 +++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 50 insertions(+), 1 deletion(-)
+
+diff --git a/lib/MogileFS/Worker/Query.pm b/lib/MogileFS/Worker/Query.pm
+index bde7f98..0024bb8 100644
+--- a/lib/MogileFS/Worker/Query.pm
++++ b/lib/MogileFS/Worker/Query.pm
+@@ -264,10 +264,21 @@ sub cmd_create_open {
+         @devices = sort_devs_by_freespace(@devices);
+     }
+ 
++    # Create a MogileFS::Class instance, which we can use for determining a replication policy
++    # which in turn, lets us create a replication request to get ideal devs for this class.
++    my $classobj = Mgd::class_factory()->get_by_id($dmid, $classid);
++
+     # find suitable device(s) to put this file on.
+     my @dests; # MogileFS::Device objects which are suitable
+ 
+-    while (scalar(@dests) < ($multi ? 3 : 1)) {
++    # If we're doing a multi_dest create_open, and a class has a min dev count greater than 1,
++    # we should probably use that for the number of devices to return.
++    my $dev_count = $multi ? 3 : 1;
++    if ($multi && $classobj->mindevcount > 1) {
++        $dev_count = $classobj->mindevcount;
++    }
++
++    while (scalar(@dests) < $dev_count) {
+         my $ddev = shift @devices;
+ 
+         last unless $ddev;
+@@ -293,6 +304,44 @@ sub cmd_create_open {
+         return $self->err_line("db");
+     }
+ 
++    # We want to use the devices already determined as decent for this new file when
++    # calling replicate_to. To do this, we must create a map of devid => device.
++    my %device_map = map { $_->id => $_ } @devices;
++    my $replobj = $classobj->repl_policy_obj();
++    my $replreq = $replobj->replicate_to(fid => $fidid,
++                                         on_devs => [],
++                                         all_devs => \%device_map,
++                                         failed => {},
++                                         min => $classobj->mindevcount());
++
++    # Now we have a replication request, we can reach into ideal to get a list of ideal devices
++    my @repl_devices = $replreq->copy_to_one_of_ideally();
++
++    # If we have ideal devices, update @dests. This should be fine, since
++    # the tempfile table is not a definitive authority on where a new file will
++    # be created.
++    if (scalar(@repl_devices) > 0) {
++        my @new_dests;
++        while (scalar(@new_dests) < $dev_count) {
++            my $ddev = shift @repl_devices;
++
++            last unless $ddev;
++            next unless $ddev->not_on_hosts(map { $_->host } @new_dests);
++
++            push @new_dests, $ddev;
++            # Create a new replication request, this time with on_devs set to our proposed new destinations.
++            # We do this because it will cause the replication policy to return new ideal devices that do not
++            # include devs we already intend to write to.
++            my $rr = $replreq = $replobj->replicate_to(fid => $fidid, on_devs => \@new_dests, all_devs => \%device_map,
++                                                       failed => {}, min => $classobj->mindevcount);
++            @repl_devices = $rr->copy_to_one_of_ideally();
++        }
++        if (scalar(@new_dests) > 0) {
++            @dests = @new_dests;
++        }
++    }
++
++
+     # make sure directories exist for client to be able to PUT into
+     my %dir_done;
+     $profstart->("vivify_dir_on_all_devs");
+
+From 3c073414e6db914a88a0252126ee70bbb160a7e8 Mon Sep 17 00:00:00 2001
+From: Allan Feid <afeid@shutterstock.com>
+Date: Wed, 21 Jan 2015 13:23:23 -0500
+Subject: [PATCH 2/4] Support a setting for multi_dest device count.
+
+---
+ lib/MogileFS/Config.pm       |  1 +
+ lib/MogileFS/Worker/Query.pm | 12 ++++++++----
+ 2 files changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/lib/MogileFS/Config.pm b/lib/MogileFS/Config.pm
+index 4e3e669..dd98410 100644
+--- a/lib/MogileFS/Config.pm
++++ b/lib/MogileFS/Config.pm
+@@ -376,6 +376,7 @@ sub server_setting_is_writable {
+     if ($key eq "case_sensitive_list_keys") { return $bool };
+     if ($key eq "memcache_servers") { return $any  };
+     if ($key eq "memcache_ttl") { return $num };
++    if ($key eq "multi_dest_dev_count") { return $num };
+     if ($key eq "internal_queue_limit") { return $num };
+ 
+     # ReplicationPolicy::MultipleNetworks
+diff --git a/lib/MogileFS/Worker/Query.pm b/lib/MogileFS/Worker/Query.pm
+index 0024bb8..826f70d 100644
+--- a/lib/MogileFS/Worker/Query.pm
++++ b/lib/MogileFS/Worker/Query.pm
+@@ -272,10 +272,14 @@ sub cmd_create_open {
+     my @dests; # MogileFS::Device objects which are suitable
+ 
+     # If we're doing a multi_dest create_open, and a class has a min dev count greater than 1,
+-    # we should probably use that for the number of devices to return.
+-    my $dev_count = $multi ? 3 : 1;
+-    if ($multi && $classobj->mindevcount > 1) {
+-        $dev_count = $classobj->mindevcount;
++    # we should probably use that for the number of devices to return. If there's a multi_dest_dev_count,
++    # use that as the definitive number.
++    my $dev_count = 1;
++    if ($multi) {
++        if ($classobj->mindevcount > 1) {
++            $dev_count = $classobj->mindevcount;
++        }
++        $dev_count  = MogileFS::Config->server_setting_cached("multi_dest_dev_count") || $dev_count;
+     }
+ 
+     while (scalar(@dests) < $dev_count) {
+
+From db18a3b03ff191bee8ac1cda63fa570131dcfcfe Mon Sep 17 00:00:00 2001
+From: Allan Feid <afeid@shutterstock.com>
+Date: Wed, 21 Jan 2015 15:06:43 -0500
+Subject: [PATCH 3/4] Allow updating tempfile row.
+
+This way we can change the expected devids as necessary.
+---
+ lib/MogileFS/Store.pm        | 9 +++++++++
+ lib/MogileFS/Worker/Query.pm | 5 +++++
+ 2 files changed, 14 insertions(+)
+
+diff --git a/lib/MogileFS/Store.pm b/lib/MogileFS/Store.pm
+index e45eccc..516a4de 100644
+--- a/lib/MogileFS/Store.pm
++++ b/lib/MogileFS/Store.pm
+@@ -1193,6 +1193,15 @@ sub tempfile_row_from_fid {
+                                          undef, $fidid);
+ }
+ 
++# update tempfile row for fid with new expected devids
++sub update_tempfile_devids {
++    my ($self, $fidid, $devids) = @_;
++    $self->dbh->do("UPDATE tempfile set devids=? WHERE fid=?", undef,
++                   $devids, $fidid);
++    $self->condthrow;
++    return 1
++}
++
+ # return 1 on success, throw "dup" on duplicate devid or throws other error on failure
+ sub create_device {
+     my ($self, $devid, $hostid, $status) = @_;
+diff --git a/lib/MogileFS/Worker/Query.pm b/lib/MogileFS/Worker/Query.pm
+index 826f70d..4345d9d 100644
+--- a/lib/MogileFS/Worker/Query.pm
++++ b/lib/MogileFS/Worker/Query.pm
+@@ -342,6 +342,11 @@ sub cmd_create_open {
+         }
+         if (scalar(@new_dests) > 0) {
+             @dests = @new_dests;
++            eval { $sto->update_tempfile_devids($fidid, join(',', map { $_->id } @dests)); };
++            if (@_) {
++                warn "Error updating devids for tempfile: @_\n";
++                return $self->err_line("failure updating devids");
++            }
+         }
+     }
+ 
+
+From 8d55116ef3f22813aa3443a3ff862fb3f4cfc926 Mon Sep 17 00:00:00 2001
+From: Allan Feid <afeid@shutterstock.com>
+Date: Wed, 21 Jan 2015 15:29:55 -0500
+Subject: [PATCH 4/4] Be more aggressive about meeting dev_count.
+
+It is possible that when requesting multi_dest create_open, that we do
+not have enough devices to suggest. To mitigate this, keep track of
+devices we skipped due to being on the same host as other devices. Then
+add these at the end to make up for the lacking devices.
+
+If there's no way to get to dev_count, return what we have.
+---
+ lib/MogileFS/Worker/Query.pm | 19 ++++++++++++++++++-
+ 1 file changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/lib/MogileFS/Worker/Query.pm b/lib/MogileFS/Worker/Query.pm
+index 4345d9d..354f693 100644
+--- a/lib/MogileFS/Worker/Query.pm
++++ b/lib/MogileFS/Worker/Query.pm
+@@ -326,11 +326,17 @@ sub cmd_create_open {
+     # be created.
+     if (scalar(@repl_devices) > 0) {
+         my @new_dests;
++        my @extra_dests;
+         while (scalar(@new_dests) < $dev_count) {
+             my $ddev = shift @repl_devices;
+ 
+             last unless $ddev;
+-            next unless $ddev->not_on_hosts(map { $_->host } @new_dests);
++            # If we already have a destination on this host, skip it but
++            # keep around the device for later if we do not have enough to meet our dev_count
++            unless ($ddev->not_on_hosts(map { $_->host } @new_dests)) {
++                push @extra_dests, $ddev;
++                next;
++            }
+ 
+             push @new_dests, $ddev;
+             # Create a new replication request, this time with on_devs set to our proposed new destinations.
+@@ -341,6 +347,17 @@ sub cmd_create_open {
+             @repl_devices = $rr->copy_to_one_of_ideally();
+         }
+         if (scalar(@new_dests) > 0) {
++            # Make sure we have enough devices one more time, however,
++            # if extra_dests is empty we will not be able to return dev_count.
++            while (scalar(@new_dests) < $dev_count) {
++                my $ddev = shift @extra_dests || shift @dests;
++                last unless $ddev;
++                # Ensure we don't add a device that already exists
++                if (grep($_->id == $ddev->id, @new_dests)) {
++                    next;
++                }
++                push @new_dests, $ddev;
++            }
+             @dests = @new_dests;
+             eval { $sto->update_tempfile_devids($fidid, join(',', map { $_->id } @dests)); };
+             if (@_) {

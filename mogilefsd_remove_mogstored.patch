@@ -1,0 +1,12 @@
+diff -uNr MogileFS-Server-2.73_orig/Makefile.PL MogileFS-Server-2.73/Makefile.PL
+--- MogileFS-Server-2.73_orig/Makefile.PL	2018-01-20 00:42:46.000000000 +0300
++++ MogileFS-Server-2.73/Makefile.PL	2019-06-10 12:21:37.061414718 +0400
+@@ -11,7 +11,7 @@
+ 
+ use ExtUtils::MakeMaker;
+ 
+-my $exefiles = ["mogstored", "mogilefsd", "mogdbsetup", "mogautomount"];
++my $exefiles = ["mogilefsd", "mogdbsetup"];
+ $exefiles = ["mogstored"] if exists $ENV{DANGABUILD_MOGSTOREDONLY};
+ $exefiles = ["mogilefsd"] if exists $ENV{DANGABUILD_MOGILEFSDONLY};
+ 
