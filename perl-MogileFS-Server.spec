@@ -4,8 +4,8 @@ Release:    1%{?dist}
 Summary:    Server part of the MogileFS distributed filesystem
 License:    GPL+ or Artistic
 Group:      System Environment/Daemons
-URL:        http://search.cpan.org/dist/MogileFS-Server/
-Source0:    http://search.cpan.org/CPAN/authors/id/D/DO/DORMANDO/MogileFS-Server-%{version}.tar.gz
+URL:        https://github.com/mogilefs/MogileFS-Server
+Source0:    https://github.com/mogilefs/MogileFS-Server/archive/%{version}.tar.gz
 Source2:    mogilefsd.init
 Source3:    mogilefsd.conf
 Source4:    mogilefs.conf
