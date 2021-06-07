@@ -32,7 +32,7 @@ diff -uNr MogileFS-Server-2.73.orig/lib/MogileFS/ProcManager.pm MogileFS-Server-
                             $client,
                             ($client->peer_ip_string || '0.0.0.0') . " $line"
                             ];
-+    if ($line !~ /^(get_paths|noop)/ && MogileFS->config("audit_log")) {
++    if ($line !~ /^(get_paths|noop|replicate)/ && MogileFS->config("audit_log")) {
 +           Mgd::log('info', "$line self: $client->{peer_ip}");
 +    }
      MogileFS::ProcManager->ProcessQueues;

@@ -12,6 +12,7 @@ Source4:    mogilefs.conf
 Patch0:	    mogilefsd_remove_mogstored.patch
 Patch1:	    replication-policy-create-open.patch
 Patch2:	    mogilefs_crash_fix.patch
+Patch3:	    audit.patch
 
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-root-%(%{__id_u} -n)
 BuildArch:  noarch
