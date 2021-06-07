@@ -1,6 +1,6 @@
 Name:       perl-MogileFS-Server
 Version:    2.73
-Release:    1%{?dist}
+Release:    2%{?dist}
 Summary:    Server part of the MogileFS distributed filesystem
 License:    GPL+ or Artistic
 Group:      System Environment/Daemons
@@ -55,6 +55,7 @@ rm -f mogautomount
 %patch0 -p1
 %patch1 -p1
 %patch2 -p1
+%patch3 -p1
 
 %build
 %{__perl} Makefile.PL INSTALLDIRS=vendor

@@ -1,0 +1,40 @@
+diff -uNr MogileFS-Server-2.73.orig/lib/MogileFS/Config.pm MogileFS-Server-2.73/lib/MogileFS/Config.pm
+--- MogileFS-Server-2.73.orig/lib/MogileFS/Config.pm	2014-12-16 08:45:50.000000000 +0200
++++ MogileFS-Server-2.73/lib/MogileFS/Config.pm	2021-06-07 13:18:21.000000000 +0300
+@@ -72,6 +72,7 @@
+     $pidfile,
+     $repl_use_get_port,
+     $local_network,
++    $audit_log,             # log to syslog notify about commands and ip except get_paths, noop
+    );
+ 
+ my $default_mindevcount;
+@@ -108,6 +109,7 @@
+                              'repl_use_get_port=i' => \$cmdline{repl_use_get_port},
+                              'local_network=s' => \$cmdline{local_network},
+                              'mogstored_stream_port' => \$cmdline{mogstored_stream_port},
++                             'audit_log' => \$cmdline{audit_log},
+                              'job_master!'    => \$cmdline{job_master},
+                              );
+ 
+@@ -147,6 +149,7 @@
+     # specified on the command line. Command line takes precedence, then values in
+     # the config file, then the defaults.
+     $daemonize      = choose_value( 'daemonize', 0 );
++    $audit_log      = choose_value( 'audit_log', 0 );
+     $db_dsn         = choose_value( 'db_dsn', "DBI:mysql:mogilefs" );
+     $db_user        = choose_value( 'db_user', "mogile" );
+     $db_pass        = choose_value( 'db_pass', "", 1 );
+diff -uNr MogileFS-Server-2.73.orig/lib/MogileFS/ProcManager.pm MogileFS-Server-2.73/lib/MogileFS/ProcManager.pm
+--- MogileFS-Server-2.73.orig/lib/MogileFS/ProcManager.pm	2018-01-19 23:40:57.000000000 +0200
++++ MogileFS-Server-2.73/lib/MogileFS/ProcManager.pm	2021-06-07 13:19:53.000000000 +0300
+@@ -440,6 +440,9 @@
+                            $client,
+                            ($client->peer_ip_string || '0.0.0.0') . " $line"
+                            ];
++    if ($line !~ /^(get_paths|noop)/ && MogileFS->config("audit_log")) {
++           Mgd::log('info', "$line self: $client->{peer_ip}");
++    }
+     MogileFS::ProcManager->ProcessQueues;
+     if (@PendingQueries) {
+         # Don't like the name. Feel free to change if you find better.
