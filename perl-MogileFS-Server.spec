@@ -1,6 +1,6 @@
 Name:       perl-MogileFS-Server
 Version:    2.73
-Release:    2%{?dist}
+Release:    3%{?dist}
 Summary:    Server part of the MogileFS distributed filesystem
 License:    GPL+ or Artistic
 Group:      System Environment/Daemons
