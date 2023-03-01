@@ -29,6 +29,7 @@ BuildRequires:  perl-Sys-Syscall
 BuildRequires:  perl-Digest-MD5
 BuildRequires:  perl-Digest
 BuildRequires:  perl-HTTP-Message
+BuildRequires:  perl-Net-HTTP
 %endif
 Requires:       perl(:MODULE_COMPAT_%(eval "`%{__perl} -V:version`"; echo $version))
 
