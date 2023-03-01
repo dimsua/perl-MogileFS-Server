@@ -28,6 +28,7 @@ BuildRequires:  perl-Sys-Syscall
 %if 0%{?rhel} >= 8
 BuildRequires:  perl-Digest-MD5
 BuildRequires:  perl-Digest
+BuildRequires:  perl-HTTP-Message
 %endif
 Requires:       perl(:MODULE_COMPAT_%(eval "`%{__perl} -V:version`"; echo $version))
 
