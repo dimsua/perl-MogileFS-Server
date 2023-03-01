@@ -25,6 +25,7 @@ BuildRequires:  perl-Danga-Socket
 BuildRequires:  perl(Sys::Syslog)
 BuildRequires:  perl-Time-HiRes
 BuildRequires:  perl-Sys-Syscall
+BuildRequires:  perl-Digest
 Requires:       perl(:MODULE_COMPAT_%(eval "`%{__perl} -V:version`"; echo $version))
 
 Provides:  MogileFS-Server = %{version}-%{release}
