@@ -21,7 +21,7 @@ BuildRequires:  perl(ExtUtils::MakeMaker)
 BuildRequires:  perl(Test::More)
 BuildRequires:  perl-MogileFS-Client
 BuildRequires:  perl-MogileFS-Utils
-BuildRequires:  perl-Danga-Socker
+BuildRequires:  perl-Danga-Socket
 BuildRequires:  perl(Sys::Syslog)
 Requires:       perl(:MODULE_COMPAT_%(eval "`%{__perl} -V:version`"; echo $version))
 
