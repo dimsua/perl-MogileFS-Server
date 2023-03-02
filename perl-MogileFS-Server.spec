@@ -31,6 +31,7 @@ BuildRequires:  perl-Digest
 BuildRequires:  perl-HTTP-Message
 BuildRequires:  perl-Net-HTTP
 BuildRequires:  perl-libwww-perl
+BuildRequires:  perl-IO-stringy
 %endif
 Requires:       perl(:MODULE_COMPAT_%(eval "`%{__perl} -V:version`"; echo $version))
 
